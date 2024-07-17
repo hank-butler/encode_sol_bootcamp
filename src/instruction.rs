@@ -95,6 +95,31 @@ impl StrategyInstruction {
         );
     }
 
-    
+    pub fn withdraw(
+        program_id: &Pubkey,
+        token_program_id: &Pubkey,
+        source_pubkey: &Pubkey,
+        target_pubkey: &Pubkey,
+        additional_account_metas: Vec<AccountMeta>,
+        amount: u64
+    ) -> Result<Instruction, ProgramError> {
+        return create_transfer(
+            Self::Withdraw { amount }.pack(),
+            program_id,
+            token_program_id,
+            source_pubkey,
+            target_pubkey,
+            additional_account_metas
+
+        );
+    }   
+
 }
 
+impl VaultInstruction {
+    pub fn unpack(input: &[u8]) -> Result<Self, ProgramError> {
+        let (tag, rest) = input.split_first().ok_or(InvalidInstruction)?;
+
+        
+    }
+}
