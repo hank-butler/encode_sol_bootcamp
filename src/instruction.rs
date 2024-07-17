@@ -61,7 +61,40 @@ impl StrategyInstruction {
     }
     
     fn pack(&self) -> Vec<u8> {
-        
+        let mut buf = Vec::with_capacity(size_of::<Self>());
+        match self {
+            $Self::Deposit { amount } => {
+                buf.push(2);
+                buf.extend_from_slice(&amount.to_le_bytes());
+            }
+
+            &Self::Withdraw { amount } => {
+                bug.push(3);
+                buf.extend_from_slice(&amount.to_le_bytes());
+            }
+        }
+        buf
+
     }
+
+    pub fn desposit(
+        program_id: &Pubkey,
+        token_program_id: &Pubkey,
+        source_pubkey: &Pubkey,
+        target_pubkey: &Pubkey,
+        additional_account_metas: Vec<AccountMeta>,
+        amount: u64
+    ) -> Result<Instruction, ProgramError> {
+        return create_transfer(
+        Self::Deposit { amount }.pack(),
+        program_id,
+        token_program_id,
+        source_pubkey,
+        target_pubkey,
+        additional_account_metas,
+        );
+    }
+
+    
 }
 
