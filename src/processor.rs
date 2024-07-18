@@ -1,5 +1,5 @@
 use solana_program::{
-    account_info::{next_acount_info, AccountInfo},
+    account_info::{next_account_info, AccountInfo},
     entrypoint::ProgramResult,
     msg,
     program::{invoke, invoke_signed},
@@ -54,5 +54,137 @@ impl Processor {
         strategy_program_withdraw_id: u8,
     ) -> ProgramResult {
         let account_info_tier = &mut accounts.iter();
+
+        let initializer = next_acount_info(account_info_tier)?;
+
+        if !initializer.is_signer {
+            return Err(ProgramError::MissingRequiredSignature);
+        }
+
+        let storage_account = next_account_info(account_info_iter)?;
+    let lx_token_account = next_account_info(account_info_iter)?;
+    let llx_token_mint_id = next_account_info(account_info_iter)?;
+    let token_program = next_account_info(account_info_iter)?;
+    let strategy_program = next_account_info(account_info_iter)?;
+    let rent = &Rent::from_account_info(next_account_info(account_info_iter)?)?;
+
+    if *lx_token_account.owner != spl_token::id() || *llx_token_mint_id.owner != spl_token::id() {
+      return Err(ProgramError::IncorrectProgramId);
+    }
+
+    if !rent.is_exempt(storage_account.lamports(), storage_account.data_len()) {
+      return Err(VaultError::NotRentExempt.into());
+    }
+
+    let mut storage_info = Vault::unpack_unchecked(&storage_account.data.borrow())?;
+    if storage_info.is_initialized() {
+      return Err(ProgramError::AccountAlreadyInitialized);
+    }
+
+    storage_info.is_initialized = true;
+    storage_info.hodl = hodl;
+    storage_info.llx_token_mint_id = *llx_token_mint_id.key;
+    msg!("Setting auth");
+    if hold {
+      msg!("Transferring program X token ownership");
+      let x_token_account = next_account_info(account_info_iter)?;
+      storage_info.x_token_account = COption::Some(*x_token_account.key);
+      // Transfer ownership of the temp account to this program via a derived address.
+      let (pda, _bump_seed) = Pubkey::find_program_address(&[b"vault"], program_id);
+      let account_owner_change_ix = spl_token::instruction::set_authority(
+        token_program.key,
+        x_token_account.key,
+        Some(&pda),
+        spl_token::instruction::AuthorityType::AccountOwner,
+        initializer.key,
+        &[&initializer.key],
+      )?;
+      invoke(
+        &account_owner_change_ix,
+        &[
+          x_token_account.clone(),
+          initializer.clone(),
+          token_program.clone(),
+        ],
+      )?;
+    }
+    storage_info.strategy_program_id = *strategy_program.key;
+    storage_info.strategy_program_deposit_instruction_id = strategy_program_deposit_instruction_id;
+    storage_info.strategy_program_withdraw_instruction_id =
+      strategy_program_withdraw_instruction_id;
+    Vault::pack(storage_info, &mut storage_account.data.borrow_mut())?;
+
+    let (pda, _bump_seed) = Pubkey::find_program_address(&[b"vault"], program_id);
+    let account_owner_change_ix = spl_token::instruction::set_authority(
+      token_program.key,
+      lx_token_account.key,
+      Some(&pda),
+      spl_token::instruction::AuthorityType::AccountOwner,
+      initializer.key,
+      &[&initializer.key],
+    )?;
+
+    invoke(
+      &account_owner_change_ix,
+      &[
+        lx_token_account.clone(),
+        initializer.clone(),
+        token_program.clone(),
+      ],
+    )?;
+    let mint_owner_change_ix = spl_token::instruction::set_authority(
+      token_program.key,
+      llx_token_mint_id.key,
+      Some(&pda),
+      spl_token::instruction::AuthorityType::MintTokens,
+      initializer.key,
+      &[&initializer.key],
+    )?;
+
+    msg!("Calling the token program to transfer llX token mint authority");
+    msg!(
+      "Token program: {}. Transferring minting control {} -> {}",
+      token_program.key,
+      initializer.key,
+      pda
+    );
+    invoke(
+      &mint_owner_change_ix,
+      &[
+        llx_token_mint_id.clone(),
+        initializer.clone(),
+        token_program.clone(),
+      ],
+    )?;
+    Ok(())
+    }
+
+    fn process_transfer(
+        program_id: &Pubkey,
+        accounts: &[AccountInfo],
+        amount: u64,
+        is_deposit: bool
+    ) -> ProgramResult {
+        let account_info_iter = &mut accounts.iter();
+
+        let token_program = next_account_info(account_info_iter);
+        let source_token_account = next_account_info(account_info_iter)?;
+        let target_token_account = next_account_info(account_info_iter)?;
+
+        let source_authority = next_account_info(account_info_iter)?;
+        let storage_account = next_account_info(account_info_iter)?;
+
+        let storage_info = Vault::unpack_unchecked(&storage_account.data.borrow())?;
+        if !storage_info.is_initialized() {
+            return Err(VaultError::InvalidInstruction.into());
+        }
+
+        if is_deposit {
+            msg!("Mint tokens to client account");
+        } else {
+            msg!("transfers and burn tokens");
+        }
+
+        
     }
 }
