@@ -104,3 +104,33 @@ impl Pack for Vault {
     }
 
 }
+
+impl IsInitialized for Vault {
+    fn is_initialized(&self) -> bool {
+        self.is_initialized
+    }
+}
+
+fn pack_coption_key(src: &COption<Pubkey>, ds: &mut [u8; 36]) {
+    let (tag, body) = mut_array_refs![dst, 4, 32];
+
+    match src {
+        COption::some(key) => {
+            *tag = [1, 0, 0, 0];
+            body.copy_from_slice(key.as_ref());
+        }
+        COption::None => {
+            *tag = [0; 4];
+        }
+    }
+}
+
+fn unpack_coption_key(src: &[u8; 36 ]) -> Result<COption<Pubkey>, ProgramError> {
+    let (tag, body) = array_refs![src, 4, 32];
+
+    match *tag {
+        [0, 0, 0, 0] => Ok(COption::None),
+        [1, 0, 0, 0] => Ok(COption::Some(Pubkey::new_from_array(*body))),
+        _ => Err(ProgramError::InvalidAccountData),
+    }
+}
