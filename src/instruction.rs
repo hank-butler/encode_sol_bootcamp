@@ -120,6 +120,27 @@ impl VaultInstruction {
     pub fn unpack(input: &[u8]) -> Result<Self, ProgramError> {
         let (tag, rest) = input.split_first().ok_or(InvalidInstruction)?;
 
-        
+        Ok(match tag {
+            0 => {
+                let hold = *rest.get(0).unwrap();
+                let strategy_program_deposit_instruction_id = *rest.get(0).unwrap();
+                let strategy_program_withdraw_instruction_id = *rest.get(1).unwrap();
+                Self::InitializeVault {
+                    hold: if hold == 1 { true } else { false },
+                    strategy_program_deposit_instruction_id,
+                    strategy_program_withdraw_instruction_id,
+                }
+            }
+            1 | 2 => {
+                let amount = rest
+                    .get(..8)
+                    .and_then(|slice| slice.try_into().ok())
+                    .map(u64::from_le_bytes)
+                    .ok_or(InvalidInstruction)?;
+            }
+            _ => return Err(VaultError::InvalidInstruction.info()),
+        })
     }
+
+    
 }
