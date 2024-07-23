@@ -1,3 +1,6 @@
+// idea behind yearn finance
+// https://medium.com/iearn/yearn-finance-explained-what-are-vaults-and-strategies-96970560432
+
 use crate::error::{Vault, VaultError::InvalidInstruction};
 use solana_program::program_error::ProgramError;
 use solana_program::{
